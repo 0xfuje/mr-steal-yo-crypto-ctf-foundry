@@ -15,26 +15,28 @@ let o1: Signer;
 let o2: Signer;
 let admin: Signer; // should not be used
 let adminUser: Signer; // should not be used
-let flashLoaner: Contract; // flashloan contract
+let adminUser2: Signer; // should not be used
+let optionsContract: Contract; // core contract
 let usdc: Contract; // token contracts
 let dai: Contract;
 let uniFactory: Contract; // uniswap contracts
 let uniRouter: Contract;
-let uniPair: Contract; // DAI-USDC pool
+let usdcDaiPair: Contract;
+let usdcEthPair: Contract;
 let weth: Contract;
 
 /// preliminary state
 before(async () => {
 
   accounts = await ethers.getSigners();
-  [attacker, o1, o2, admin, adminUser] = accounts;
+  [attacker, o1, o2, admin, adminUser, adminUser2] = accounts;
 
   // deploying token contracts:
   let usdcFactory = await ethers.getContractFactory('Token')
   usdc = await usdcFactory.connect(admin).deploy('USDC','USDC')
   await usdc.connect(admin).mintPerUser(
-    [await admin.getAddress(), await adminUser.getAddress()], 
-    [precision.mul(1_000_000), precision.mul(100_000)], 
+    [await admin.getAddress(), await adminUser.getAddress()],
+    [precision.mul(2_000_000), precision.mul(100_000)]
   )
 
   let daiFactory = await ethers.getContractFactory('Token')
@@ -46,6 +48,8 @@ before(async () => {
   // deploying uniswap contracts:
   let wethFactory = await ethers.getContractFactory('WETH9')
   weth = await wethFactory.connect(admin).deploy()
+  await weth.connect(admin).deposit({value:precision.mul(500)})
+  await weth.connect(adminUser2).deposit({value:precision.mul(50)})
 
   let uniFactoryFactory = new ethers.ContractFactory(factoryJson.abi, factoryJson.bytecode)
   uniFactory = await uniFactoryFactory.connect(admin).deploy(await admin.getAddress())
@@ -53,11 +57,12 @@ before(async () => {
   let uniRouterFactory = new ethers.ContractFactory(routerJson.abi, routerJson.bytecode)
   uniRouter = await uniRouterFactory.connect(admin).deploy(uniFactory.address,weth.address)
 
-  // --adding initial liquidity for DAI
+  // --adding initial liquidity
   await usdc.connect(admin).approve(uniRouter.address,ethers.constants.MaxUint256)
   await dai.connect(admin).approve(uniRouter.address,ethers.constants.MaxUint256)
+  await weth.connect(admin).approve(uniRouter.address,ethers.constants.MaxUint256)
 
-  await uniRouter.connect(admin).addLiquidity( // creates pair
+  await uniRouter.connect(admin).addLiquidity( // creates USDC-DAI pair
     usdc.address,dai.address,
     precision.mul(1_000_000),
     precision.mul(1_000_000),
@@ -68,31 +73,53 @@ before(async () => {
 
   let pairAddress = await uniFactory.getPair(usdc.address,dai.address)
   let uniPairFactory = new ethers.ContractFactory(pairJson.abi, pairJson.bytecode, admin)
-  uniPair = uniPairFactory.attach(pairAddress)
+  usdcDaiPair = uniPairFactory.attach(pairAddress)
 
-  // initializing core contracts:
-  let flashLoanerFactory = await ethers.getContractFactory('FlashLoaner')
-  flashLoaner = await flashLoanerFactory.connect(admin).deploy(usdc.address,"fUSDC","fUSDC")
+  await uniRouter.connect(admin).addLiquidity( // creates USDC-ETH pair
+    usdc.address,weth.address,
+    precision.mul(1_000_000),
+    precision.mul(500),
+    0,0,
+    await admin.getAddress(),
+    (await ethers.provider.getBlock('latest')).timestamp*2
+  )
 
-  await usdc.connect(adminUser).approve(flashLoaner.address,ethers.constants.MaxUint256)
-  await flashLoaner.connect(adminUser).deposit(precision.mul(100_000),await adminUser.getAddress())
+  pairAddress = await uniFactory.getPair(usdc.address,weth.address)
+  usdcEthPair = uniPairFactory.attach(pairAddress)
+
+  // deploying core contracts
+  let optionsContractFactory = await ethers.getContractFactory('CallOptions')
+  optionsContract = await optionsContractFactory.connect(admin).deploy(
+    usdc.address,
+    weth.address,
+    usdcEthPair.address,
+    uniFactory.address,
+    uniRouter.address
+  )
+
+  // --initial interactions with core contracts
+  await weth.connect(adminUser2).approve(optionsContract.address,ethers.constants.MaxUint256)
+  let expiryTime = (await ethers.provider.getBlock('latest')).timestamp+(60*60*24*7) // one week
+  await optionsContract.connect(adminUser2).createOption(
+    precision.mul(1),
+    precision.mul(2100),
+    precision.mul(100),
+    expiryTime
+  )
+  let createdOptionId = await optionsContract.connect(adminUser).getLatestOptionId()
+  await usdc.connect(adminUser).approve(optionsContract.address,ethers.constants.MaxUint256)
+  await optionsContract.connect(adminUser).purchaseOption(createdOptionId)
 
 });
 
 it("solves the challenge", async function () {
-
-  let flashExploiterFactory = await ethers.getContractFactory('FlashExploiter')
-  let flashExploiter = await flashExploiterFactory.connect(attacker).deploy()
-
-  await flashExploiter.connect(attacker).runExploit(uniPair.address,flashLoaner.address)
 
 });
 
 /// expected final state
 after(async () => {
 
-  // attacker drains >= 99% of funds
-  expect(await usdc.balanceOf(await attacker.getAddress())).to.be.gte(precision.mul(99_000));
-  expect(await usdc.balanceOf(flashLoaner.address)).to.be.lte(precision.mul(1_000));
+  // attacker steals at least 90k USDC
+  expect(await usdc.balanceOf(await attacker.getAddress())).to.be.gte(precision.mul(90_000))
 
 });

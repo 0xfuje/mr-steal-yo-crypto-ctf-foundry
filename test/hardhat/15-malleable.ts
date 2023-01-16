@@ -59,12 +59,6 @@ before(async () => {
 
 it("solves the challenge", async function () {
 
-  let newS = BN.from('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141').sub(sig.s)
-  newS = ethers.utils.hexlify(newS)
-  let newV = sig.v == 28 ? 27 : 28
-
-  await treasureVault.connect(attacker).sendFundsWithAuth(precision.mul(1),0,newV,sig.r,newS)
-
 });
 
 /// expected final state

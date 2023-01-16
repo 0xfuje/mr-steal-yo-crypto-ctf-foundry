@@ -15,11 +15,10 @@ let o1: Signer;
 let o2: Signer;
 let admin: Signer; // should not be used
 let adminUser: Signer; // should not be used
-let safuUtils: Contract; // core contracts
-let safuPool: Contract;
+let eminenceCurrencyBase: Contract; // core contracts
+let eminenceCurrency: Contract;
 let usdc: Contract; // token contracts
 let dai: Contract;
-let safu: Contract;
 let uniFactory: Contract; // uniswap contracts
 let uniRouter: Contract;
 let uniPair: Contract; // DAI-USDC pool
@@ -35,20 +34,14 @@ before(async () => {
   let usdcFactory = await ethers.getContractFactory('Token')
   usdc = await usdcFactory.connect(admin).deploy('USDC','USDC')
   await usdc.connect(admin).mintPerUser(
-    [await admin.getAddress(), await adminUser.getAddress()], 
-    [precision.mul(1_000_000), precision.mul(100_000)], 
+    [await admin.getAddress()], [precision.mul(1_000_000)]
   )
 
   let daiFactory = await ethers.getContractFactory('Token')
   dai = await daiFactory.connect(admin).deploy('DAI','DAI')
   await dai.connect(admin).mintPerUser(
-    [await admin.getAddress()],[precision.mul(1_000_000)]
-  )
-
-  let safuFactory = await ethers.getContractFactory('Token')
-  safu = await safuFactory.connect(admin).deploy('SAFU','SAFU')
-  await safu.connect(admin).mintPerUser(
-    [await adminUser.getAddress()],[precision.mul(200_000)]
+    [await admin.getAddress(), await adminUser.getAddress()],
+    [precision.mul(1_000_000), precision.mul(200_000)]
   )
 
   // deploying uniswap contracts:
@@ -66,10 +59,12 @@ before(async () => {
   await dai.connect(admin).approve(uniRouter.address,ethers.constants.MaxUint256)
 
   await uniRouter.connect(admin).addLiquidity( // creates pair
-    usdc.address,dai.address,
+    usdc.address,
+    dai.address,
     precision.mul(1_000_000),
     precision.mul(1_000_000),
-    0,0,
+    0,
+    0,
     await admin.getAddress(),
     (await ethers.provider.getBlock('latest')).timestamp*2
   )
@@ -77,41 +72,44 @@ before(async () => {
   let pairAddress = await uniFactory.getPair(usdc.address,dai.address)
   let uniPairFactory = new ethers.ContractFactory(pairJson.abi, pairJson.bytecode, admin)
   uniPair = uniPairFactory.attach(pairAddress)
+  // console.log(await uniPair.token1()) // dai
 
-  // initializing core contracts:
-  let safuUtilsFactory = await ethers.getContractFactory('SafuUtils')
-  safuUtils = await safuUtilsFactory.connect(admin).deploy()
+  // setting up core contracts:
+  let bancorBondingCurveFactory = await ethers.getContractFactory('BancorBondingCurve')
+  let bancorBondingCurve = await bancorBondingCurveFactory.connect(admin).deploy()
+  // console.log(bancorBondingCurve.address) // hardcoded in ContinuousToken
 
-  let safuPoolFactory = await ethers.getContractFactory('SafuPool')
-  safuPool = await safuPoolFactory.connect(admin).deploy(safu.address,usdc.address,safuUtils.address)
+  // --base DAI <-> EMN bonding curve
+  let eminenceCurrencyBaseFactory = await ethers.getContractFactory('EminenceCurrencyBase') 
+  eminenceCurrencyBase = await eminenceCurrencyBaseFactory.connect(admin).deploy(
+    "Eminence","EMN",999000,dai.address
+  )
 
-  // --adding initial liquidity to pool
-  await usdc.connect(adminUser).approve(safuPool.address,ethers.constants.MaxUint256)
-  await safu.connect(adminUser).approve(safuPool.address,ethers.constants.MaxUint256)
-  await safuPool.connect(adminUser).addLiquidity(precision.mul(200_000),precision.mul(100_000))
+  // --secondary EMN <-> TOKEN bonding curve
+  let eminenceCurrencyFactory  = await ethers.getContractFactory('EminenceCurrency')
+  eminenceCurrency = await eminenceCurrencyFactory.connect(admin).deploy(
+    "eTOKEN","TOKEN",500000,eminenceCurrencyBase.address
+  )
+
+  // interacting with core contracts:
+  await dai.connect(adminUser).approve(eminenceCurrencyBase.address,ethers.constants.MaxUint256)
+  await eminenceCurrencyBase.connect(adminUser).approve(eminenceCurrency.address,ethers.constants.MaxUint256)
+
+  // --swap all DAI to EMN, convert 1/2 EMN to TOKEN
+  await eminenceCurrencyBase.connect(adminUser).buy(precision.mul(200_000),0)
+  let receivedEmn = await eminenceCurrencyBase.balanceOf(await adminUser.getAddress())
+  await eminenceCurrency.connect(adminUser).buy(receivedEmn.div(2),0)
 
 });
 
 it("solves the challenge", async function () {
-
-  let exploiterFactory = await ethers.getContractFactory('SwapperExploiter')
-  let exploiter = await exploiterFactory.connect(attacker).deploy()
-
-  await exploiter.connect(attacker).runExploit(
-    uniPair.address,
-    safuPool.address,
-    usdc.address,
-    safu.address,
-    precision.mul(900_000)
-  )
 
 });
 
 /// expected final state
 after(async () => {
 
-  // attacker drains >= 90% of funds
-  expect(await usdc.balanceOf(await attacker.getAddress())).to.be.gte(precision.mul(90_000))
-  expect(await usdc.balanceOf(safuPool.address)).to.be.lte(precision.mul(10_000))
+  // attacker steals at least 50k in DAI
+  expect(await dai.balanceOf(await attacker.getAddress())).to.be.gte(precision.mul(50_000));
 
 });

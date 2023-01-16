@@ -48,10 +48,6 @@ before(async () => {
 
 it("solves the challenge", async function () {
 
-  let advisorExploiterFactory = await ethers.getContractFactory('AdvisorExploiter')
-  let advisorExploiter = await advisorExploiterFactory.connect(attacker).deploy(rewardsAdvisor.address)
-  await advisorExploiter.connect(attacker).runExploit()
-
 });
 
 /// expected final state

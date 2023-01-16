@@ -46,12 +46,6 @@ before(async () => {
 
 it("solves the challenge", async function () {
 
-  let safuExploiterFactory = await ethers.getContractFactory('SafuExploiter')
-  let safuExploiter = await safuExploiterFactory.connect(attacker).deploy()
-
-  usdc.connect(attacker).transfer(safuExploiter.address, precision.mul(10_000))
-  await safuExploiter.connect(attacker).runExploit(usdc.address,safuVault.address)
-
 });
 
 /// expected final state
